@@ -22,6 +22,9 @@ Deletes local and remote branches that are merged into the default branch. No ar
 ### `verify-docx.sh <path-to-markdown-file>`
 Builds a DOCX and prints the heading tree. Finds `vars/org.yaml` by walking up from the file. Uses conda Python for inspection.
 
+### `lint-markdown.sh <repo-name> [file]`
+Checks markdown files for common LLM-introduced artifacts. Runs a single Python pass per file — fast enough for full-repo scans (~1s for 50+ files). Skips YAML front matter and fenced code blocks. Checks: smart/curly quotes, trailing backslashes, trailing whitespace (3+ spaces), escaped underscores/asterisks in prose, manually numbered headings, non-breaking spaces (U+00A0), mojibake byte sequences. Exit 0 = clean, exit 1 = issues found. Run before merging to the default branch.
+
 ## Key Conventions
 
 - `$PYTHON` defaults to `python` — set to your conda/venv Python path if python-docx is not on the default Python
