@@ -1,0 +1,12 @@
+# Repo registry — one line per repo
+# Fields are pipe-delimited: name | local_path | default_branch | working_branch | github_slug
+#
+# default_branch = release branch (master or main)
+# working_branch = day-to-day development branch (develop)
+#
+# Copy this file to repos.conf and update the local paths for your machine.
+# Lines starting with # are comments. Blank lines are ignored.
+
+architecture-docs | /path/to/architecture-docs | master | develop | YourOrg/architecture-docs
+dac-toolkit | /path/to/dac-toolkit | main | develop | YourOrg/dac-toolkit
+claude-repo-tools | /path/to/claude-repo-tools | main | main | YourOrg/claude-repo-tools

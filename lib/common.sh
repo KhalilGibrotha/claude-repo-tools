@@ -8,7 +8,7 @@ set -euo pipefail
 
 TOOLS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPOS_CONF="$TOOLS_ROOT/config/repos.conf"
-PYTHON="${PYTHON:-/c/Users/alexg/miniconda3/python}"
+PYTHON="${PYTHON:-python}"
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 

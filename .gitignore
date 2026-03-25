@@ -1,0 +1,8 @@
+# Local configuration (contains filesystem paths)
+config/repos.conf
+
+# Editor and OS artifacts
+*.swp
+*~
+.DS_Store
+Thumbs.db

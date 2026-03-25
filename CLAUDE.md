@@ -24,7 +24,7 @@ Builds a DOCX and prints the heading tree. Finds `vars/org.yaml` by walking up f
 
 ## Key Conventions
 
-- `$PYTHON` defaults to `/c/Users/alexg/miniconda3/python` (where python-docx is installed)
+- `$PYTHON` defaults to `python` — set to your conda/venv Python path if python-docx is not on the default Python
 - Scripts assume Git Bash on Windows (MSYS2 path conventions)
 - `gh` CLI must be authenticated
 - All path variables are double-quoted to handle OneDrive spaces
