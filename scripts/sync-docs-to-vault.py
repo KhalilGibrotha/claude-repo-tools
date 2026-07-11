@@ -9,12 +9,15 @@ Copies documentation (Markdown + referenced images) from the source repo into
 not a merge: files removed from the repo are pruned so the mirror always
 reflects the current branch exactly.
 
-The mirror is READ-ONLY by convention:
-  - It is regenerated from the repo; edits made in the vault are overwritten.
-  - Scheduled vault agents are denied write access to it.
+The mirror is READ-ONLY, enforced at the filesystem level: after each sync,
+every mirror file is marked read-only so that anything running as this user —
+including Claude Desktop scheduled vault agents that ignore Claude permission
+rules — hits an OS access-denied error if it tries to write. The sync itself
+clears the read-only flag just long enough to update each file.
 
 Usage:
-    python scripts/sync-docs-to-vault.py [--repo DIR] [--vault DIR] [--dry-run]
+    python scripts/sync-docs-to-vault.py [--repo DIR] [--vault DIR]
+                                         [--dry-run] [--writable]
 
 Defaults assume repo, vault, and this tooling repo are siblings, e.g.:
     <parent>/SECU_Document_Automation   (source repo)
@@ -24,21 +27,32 @@ Defaults assume repo, vault, and this tooling repo are siblings, e.g.:
 from __future__ import annotations
 
 import argparse
+import os
+import stat
 import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-# The dev parent that holds the sibling repos (…/dev).
 PARENT = Path(__file__).resolve().parents[2]
 MIRROR_NAME = "_architecture-docs"
 MARKER = "_ABOUT.md"
 
 INCLUDE_EXT = {".md", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
+TEXT_EXT = {".md", ".svg"}
 EXCLUDE_DIRS = {
     ".git", ".github", ".vale", ".claude", ".obsidian",
     "node_modules", "exports", "scripts", "__pycache__", ".pytest_cache",
 }
+
+
+def make_writable(path: Path) -> None:
+    if path.exists():
+        os.chmod(path, stat.S_IWRITE | stat.S_IREAD)
+
+
+def make_readonly(path: Path) -> None:
+    os.chmod(path, stat.S_IREAD | stat.S_IRGRP | stat.S_IROTH)
 
 
 def wanted_files(root: Path) -> list[Path]:
@@ -75,12 +89,19 @@ def marker_text(repo: Path) -> str:
         "# Architecture Docs — Read-Only Mirror\n\n"
         "> **Do not edit anything in this folder.** It is an auto-generated,\n"
         "> one-way mirror of the `architecture-docs` repository, refreshed by\n"
-        "> `claude-repo-tools/scripts/sync-docs-to-vault.py`. Edits here are\n"
-        "> overwritten on the next sync. Make changes in the repo instead.\n\n"
+        "> `claude-repo-tools/scripts/sync-docs-to-vault.py`. Files here are\n"
+        "> marked read-only and are overwritten on the next sync. Make changes\n"
+        "> in the repo instead.\n\n"
         f"- **Source branch:** `{branch}`\n"
         f"- **Source commit:** `{commit}`\n"
         f"- **Last synced:** {stamp}\n"
     )
+
+
+def write_file(dst: Path, data: bytes) -> None:
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    make_writable(dst)  # clear read-only if the file already exists
+    dst.write_bytes(data)
 
 
 def main() -> int:
@@ -90,6 +111,8 @@ def main() -> int:
     ap.add_argument("--vault", type=Path, default=PARENT / "lovelace",
                     help="Obsidian vault (default: sibling 'lovelace').")
     ap.add_argument("--dry-run", action="store_true", help="Report actions without writing.")
+    ap.add_argument("--writable", action="store_true",
+                    help="Do not mark the mirror read-only (default is read-only).")
     args = ap.parse_args()
 
     repo = args.repo.resolve()
@@ -109,41 +132,47 @@ def main() -> int:
     if not args.dry_run:
         mirror.mkdir(parents=True, exist_ok=True)
 
-    text_ext = {".md", ".svg"}
     for src in sources:
         dst = mirror / src.relative_to(repo)
         data = src.read_bytes()
-        # Normalize text to LF so the mirror is stable regardless of the repo's
-        # CRLF checkout and so agent re-saves (which normalize to LF) are no-ops.
-        if src.suffix.lower() in text_ext:
+        if src.suffix.lower() in TEXT_EXT:
             data = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
         if dst.exists() and dst.read_bytes() == data:
             continue
         is_new = not dst.exists()
         if not args.dry_run:
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            dst.write_bytes(data)
+            write_file(dst, data)
         copied += is_new
         updated += (not is_new)
 
     if not args.dry_run:
-        (mirror / MARKER).write_text(marker_text(repo), encoding="utf-8", newline="\n")
+        write_file(mirror / MARKER, marker_text(repo).encode("utf-8"))
 
     if mirror.exists():
         for p in mirror.rglob("*"):
             if p.is_file() and p.resolve() not in expected:
                 pruned += 1
                 if not args.dry_run:
+                    make_writable(p)
                     p.unlink()
         if not args.dry_run:
             for d in sorted(mirror.rglob("*"), key=lambda x: len(x.parts), reverse=True):
                 if d.is_dir() and not any(d.iterdir()):
                     d.rmdir()
 
+    # Enforce read-only on every remaining mirror file.
+    locked = 0
+    if not args.dry_run and mirror.exists() and not args.writable:
+        for p in mirror.rglob("*"):
+            if p.is_file():
+                make_readonly(p)
+                locked += 1
+
     prefix = "[dry-run] " if args.dry_run else ""
     print(f"{prefix}Source: {repo}")
     print(f"{prefix}Mirror: {mirror}")
-    print(f"{prefix}sources={len(sources)}  new={copied}  updated={updated}  pruned={pruned}")
+    lock_note = "" if (args.dry_run or args.writable) else f"  read-only-locked={locked}"
+    print(f"{prefix}sources={len(sources)}  new={copied}  updated={updated}  pruned={pruned}{lock_note}")
     return 0
 
 
