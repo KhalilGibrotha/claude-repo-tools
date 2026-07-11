@@ -109,9 +109,14 @@ def main() -> int:
     if not args.dry_run:
         mirror.mkdir(parents=True, exist_ok=True)
 
+    text_ext = {".md", ".svg"}
     for src in sources:
         dst = mirror / src.relative_to(repo)
         data = src.read_bytes()
+        # Normalize text to LF so the mirror is stable regardless of the repo's
+        # CRLF checkout and so agent re-saves (which normalize to LF) are no-ops.
+        if src.suffix.lower() in text_ext:
+            data = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
         if dst.exists() and dst.read_bytes() == data:
             continue
         is_new = not dst.exists()
