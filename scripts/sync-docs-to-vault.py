@@ -38,8 +38,8 @@ PARENT = Path(__file__).resolve().parents[2]
 MIRROR_NAME = "_architecture-docs"
 MARKER = "_ABOUT.md"
 
-INCLUDE_EXT = {".md", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
-TEXT_EXT = {".md", ".svg"}
+INCLUDE_EXT = {".md", ".csv", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
+TEXT_EXT = {".md", ".csv", ".svg"}
 EXCLUDE_DIRS = {
     ".git", ".github", ".vale", ".claude", ".obsidian",
     "node_modules", "exports", "scripts", "__pycache__", ".pytest_cache",
